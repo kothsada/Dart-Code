@@ -6,7 +6,7 @@ import { DebugSession, Event, InitializedEvent, OutputEvent, Scope, Source, Stac
 import { DebugProtocol } from "vscode-debugprotocol";
 import { DartCapabilities } from "../shared/capabilities/dart";
 import { VmServiceCapabilities } from "../shared/capabilities/vm_service";
-import { observatoryListeningBannerPattern, pleaseReportBug } from "../shared/constants";
+import { pleaseReportBug, vmServiceListeningBannerPattern } from "../shared/constants";
 import { LogCategory, LogSeverity } from "../shared/enums";
 import { LogMessage, SpawnedProcess } from "../shared/interfaces";
 import { safeSpawn } from "../shared/processes";
@@ -78,8 +78,8 @@ export class DartDebugSession extends DebugSession {
 	protected threadManager: ThreadManager;
 	public packageMap?: PackageMap;
 	protected sendStdOutToConsole: boolean = true;
-	protected supportsObservatory: boolean = true;
-	protected parseObservatoryUriFromStdOut: boolean = true;
+	protected supportsObservatoryWebApp: boolean = true;
+	protected parseVmServiceUriFromStdOut: boolean = true;
 	protected requiresProgram: boolean = true;
 	protected pollforMemoryMs?: number; // If set, will poll for memory usage and send events back.
 	protected processExit: Promise<{ code: number | null, signal: string | null }> = Promise.resolve({ code: 0, signal: null });
@@ -154,7 +154,7 @@ export class DartDebugSession extends DebugSession {
 		this.sendResponse(response);
 
 		if (this.useWriteServiceInfo) {
-			this.parseObservatoryUriFromStdOut = false;
+			this.parseVmServiceUriFromStdOut = false;
 			this.vmServiceInfoFile = path.join(os.tmpdir(), `dart-vm-service-${getRandomInt(0x1000, 0x10000).toString(16)}.json`);
 		}
 
@@ -175,11 +175,11 @@ export class DartDebugSession extends DebugSession {
 				process.stdout.setEncoding("utf8");
 				process.stdout.on("data", async (data) => {
 					let match: RegExpExecArray | null = null;
-					if (this.shouldConnectDebugger && this.parseObservatoryUriFromStdOut && !this.vmService) {
-						match = observatoryListeningBannerPattern.exec(data.toString());
+					if (this.shouldConnectDebugger && this.parseVmServiceUriFromStdOut && !this.vmService) {
+						match = vmServiceListeningBannerPattern.exec(data.toString());
 					}
 					if (match) {
-						await this.initDebugger(this.websocketUriForObservatoryUri(match[1]));
+						await this.initDebugger(this.vmServiceWsUriFor(match[1]));
 					} else if (this.sendStdOutToConsole)
 						this.logToUserBuffered(data.toString(), "stdout");
 				});
@@ -267,7 +267,7 @@ export class DartDebugSession extends DebugSession {
 		let url: string | undefined;
 		try {
 			if (vmServiceUri) {
-				url = this.websocketUriForObservatoryUri(vmServiceUri);
+				url = this.vmServiceWsUriFor(vmServiceUri);
 			} else {
 				this.vmServiceInfoFile = args.serviceInfoFile;
 				this.sendEvent(new Event("dart.progress", { message: `Waiting for ${this.vmServiceInfoFile}`, finished: false }));
@@ -352,7 +352,7 @@ export class DartDebugSession extends DebugSession {
 		return appArgs;
 	}
 
-	protected websocketUriForObservatoryUri(uri: string) {
+	protected vmServiceWsUriFor(uri: string) {
 		const wsUri = uri.trim();
 		if (wsUri.endsWith("/ws"))
 			return wsUri;
@@ -467,7 +467,7 @@ export class DartDebugSession extends DebugSession {
 
 		this.sendEvent(new Event("dart.debuggerUris", {
 			// If we don't support Observatory, don't send its URL back to the editor.
-			observatoryUri: this.supportsObservatory ? browserFriendlyUri.toString() : undefined,
+			observatoryUri: this.supportsObservatoryWebApp ? browserFriendlyUri.toString() : undefined,
 			vmServiceUri: browserFriendlyUri.toString(),
 		}));
 
