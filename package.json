@@ -1415,6 +1415,12 @@
 					"description": "An SSH host to run the analysis server.\nThis can be useful when modifying code on a remote machine using SSHFS.",
 					"scope": "window"
 				},
+				"dart.debounceErrorUpdates": {
+					"type": "number",
+					"default": 250,
+					"description": "Delay (in milliseconds) to debounce/merge updates of errors/problems. Increasing this may reduce flickering of squiggles while typing, at the expense of a delay in them disappearing after correcting code.",
+					"scope": "window"
+				},
 				"dart.extensionLogFile": {
 					"type": [
 						"null",

@@ -54,6 +54,7 @@ class Config {
 	get buildRunnerAdditionalArgs(): string[] { return this.getConfig<string[]>("buildRunnerAdditionalArgs", []); }
 	get checkForSdkUpdates(): boolean { return this.getConfig<boolean>("checkForSdkUpdates", true); }
 	get closingLabels(): boolean { return this.getConfig<boolean>("closingLabels", true); }
+	get debounceErrorUpdates(): number { return this.getConfig<number>("debounceErrorUpdates", 250); }
 	get debugExternalLibraries(): boolean { return this.getConfig<boolean>("debugExternalLibraries", false); }
 	get debugSdkLibraries(): boolean { return this.getConfig<boolean>("debugSdkLibraries", false); }
 	get devToolsLogFile(): undefined | string { return createFolderForFile(resolvePaths(this.getConfig<null | string>("devToolsLogFile", null))); }

@@ -7,6 +7,9 @@ import { config } from "../config";
 // TODO: This is not a provider?
 export class DartDiagnosticProvider {
 	private lastErrorJson: string | undefined;
+	private bufferTimer: NodeJS.Timer | undefined;
+	private bufferDelay = config.debounceErrorUpdates;
+	private bufferedErrors: Array<[Uri, Diagnostic[] | undefined]> = [];
 	constructor(private readonly analyzer: DasAnalyzerClient, private readonly diagnostics: DiagnosticCollection) {
 		this.analyzer.registerForAnalysisErrors((es) => this.handleErrors(es));
 
@@ -28,15 +31,35 @@ export class DartDiagnosticProvider {
 			// log("Skipping error notification as it was the same as the previous one");
 			return;
 		}
+		this.lastErrorJson = notificationJson;
 
 		let errors = notification.errors;
+
+		// Filter out TODOs if we're not upposed to show them.
 		if (!config.showTodos)
 			errors = errors.filter((error) => error.type !== "TODO");
-		this.diagnostics.set(
-			Uri.file(notification.file),
-			errors.map((e) => DartDiagnosticProvider.createDiagnostic(e)),
-		);
-		this.lastErrorJson = notificationJson;
+
+		// Add this diagnostic to the queue and then reset the timer.
+		const uri = Uri.file(notification.file);
+		const diagnostics = errors.map((e) => DartDiagnosticProvider.createDiagnostic(e));
+		this.bufferedErrors.push([uri, undefined]);
+		this.bufferedErrors.push([uri, diagnostics]);
+		this.queueFlush();
+	}
+
+	private queueFlush() {
+		if (this.bufferTimer)
+			clearTimeout(this.bufferTimer);
+		this.bufferTimer = setTimeout(() => this.flushBuffer(), config.debounceErrorUpdates);
+	}
+
+	private flushBuffer() {
+		this.diagnostics.set(this.bufferedErrors);
+		this.bufferedErrors.length = 0;
+
+		// Periodically re-read the config in case it changes. Don't do this in `queueFlush`
+		// as it's called a lot (for example at startup for every file).
+		this.bufferDelay = config.debounceErrorUpdates;
 	}
 
 	public static createDiagnostic(error: as.AnalysisError): Diagnostic {
